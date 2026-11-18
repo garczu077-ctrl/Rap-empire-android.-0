@@ -1,0 +1,62 @@
+name: Build RAP EMPIRE APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pobranie repozytorium
+        uses: actions/checkout@v4
+
+      - name: Konfiguracja Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalacja Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Rozpakowanie plikow gry z archiwum
+        run: |
+          test -f RAP-EMPIRE-source.zip || { echo 'Brak RAP-EMPIRE-source.zip w glownym katalogu repozytorium'; exit 1; }
+          mkdir -p extracted
+          unzip -q RAP-EMPIRE-source.zip -d extracted
+          test -f extracted/www/index.html || { echo 'W archiwum nie znaleziono www/index.html'; exit 1; }
+          cp -R extracted/www ./www
+          cp extracted/package.json ./package.json
+          cp extracted/capacitor.config.json ./capacitor.config.json
+
+      - name: Instalacja zaleznosci
+        run: npm install
+
+      - name: Utworzenie platformy Android
+        run: npx cap add android
+
+      - name: Synchronizacja gry z Androidem
+        run: npx cap sync android
+
+      - name: Budowanie APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Udostepnienie pliku APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RAP-EMPIRE-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
